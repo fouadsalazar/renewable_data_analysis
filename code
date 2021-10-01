@@ -1,0 +1,870 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# # Trabajo con datos y visualizaciones en Python
+# Autor: Fouad Jose Salazar Hamze
+
+# # Supuesto:
+# Una empresa energética está interesada en visualizar cómo está la red eléctrica en Tenerife. Para ello te otorga el fichero ree_Tenerife.csv con datos de varios años de la isla.
+
+# In[2]:
+
+
+# Se importa la libreria "Pandas" y se leen los datos del archivo indicado "REE_hist_Tenerife.csv"
+# Se visualizan los datos para tener una idea de los mismos 
+import pandas as pd
+datos = pd.read_csv('REE_hist_Tenerife.csv', sep = ',',index_col=0)
+datos
+
+
+# # Se piden la siguientes labores:
+
+# In[4]:
+
+
+datos.tail()
+
+
+# 1. Hubo un problema eléctrico en la isla el 29 de septiembre de 2019 que ocasionó un
+# apagón generalizado y quieren ver cómo repercutió eso en la generación de la red
+# eléctrica en Tenerife. Quieren analizar cuánta energía se generó por cada uno de los
+# métodos de generación ese día, por horas, y compararlo con la media generada en
+# todo ese año 2019, para entender cómo se actuó mientras el cero energético.
+
+# In[5]:
+
+
+#Seleccion por filtrado de filas por condicion donde se ubica el dia exacto cuando hubo el apagon
+dia_del_problema = datos[(datos["year"] == 2019) & (datos["month"] == 9) & (datos["day"] == 29)]
+
+# Se calcula el total generado por cada tecnologia para el dia 29 de septiembre de 2019
+gen_vap_total_2019_dia = dia_del_problema["vap"].sum()
+gen_gas_total_2019_dia = dia_del_problema["gas"].sum()
+gen_cc_total_2019_dia = dia_del_problema["cc"].sum()
+gen_fot_total_2019_dia = dia_del_problema["fot"].sum()
+gen_eol_total_2019_dia = dia_del_problema["eol"].sum()
+gen_die_total_2019_dia = dia_del_problema["die"].sum()
+
+#Se utiliza la libreria matplotlib.pyplot para graficar y visualizar la produccion por tecnologia para ese dia 
+import matplotlib.pyplot as plt
+y = [gen_vap_total_2019_dia, gen_gas_total_2019_dia, gen_cc_total_2019_dia, 
+     gen_fot_total_2019_dia, gen_eol_total_2019_dia,gen_die_total_2019_dia]
+x = ["vap","gas","cc","die","fot","eol"]
+    
+plt.bar(x,y)
+plt.xlabel('Tecnologia')
+plt.ylabel('MW')
+plt.title("Generacion total por tecnologia del dia 29 de septiembre de 2019")
+plt.show()
+
+
+# In[7]:
+
+
+# Para determinar a que hora se produjo el cero energetico 
+# Se agrupa los valores por hora (sacando un promedio de la produccion por hora) para la fecha indicada...
+# ...y para todo el año 2019
+
+# Primero se hace para el dia del problema
+gen_por_hora = dia_del_problema.groupby(["hour"]).mean()
+
+# Luego se hace para el año en general
+gen_por_hora_del_año = datos[(datos["year"] == 2019)].groupby(["hour"]).mean()
+
+# Se define una funcion que permite graficar la generacion promedio por hora para cada tecnologia
+def graficador(gen_por_hora,gen_por_hora_del_año,tecno):
+    y = gen_por_hora[tecno]
+    x = gen_por_hora.index
+
+    y1 = gen_por_hora_del_año[tecno]
+    x1 = gen_por_hora_del_año.index
+
+    plt.figure(figsize=(15, 5))
+    plt.subplot(121)
+    plt.bar(x,y)
+    plt.xlabel('Horas - 29 de septiembre del 2019')
+    plt.ylabel('MW')
+    plt.subplot(122)
+    plt.bar(x1,y1)
+    plt.ylabel('MW')
+    plt.xlabel('Horas - Todo el año 2019')
+    plt.suptitle('Generacion promedio por hora de ' + tecno)
+    plt.show()
+
+# Se define una una lista con cada tecnologia, y se hace un bucle con la funcion anteriormente definida
+tecnologia=["vap","gas","cc","eol","fot","die"]
+
+# Finalmente se utiliza la funcion y se grafica
+for i in range(len(tecnologia)):
+    graficador(gen_por_hora,gen_por_hora_del_año,tecnologia[i])
+
+
+# Comentario: Luego de un analisis de las graficas de barras para cada tecnologia comparando el dia del incidicente con su produccion promedio anual, se aprecia que el apagon ocurrio aproximadamente a las 2-3 de la tarde y la turbina de Gas se encargo de ser el back up de las demas tecnologias.
+
+# In[8]:
+
+
+# Para apreciar mejor (o de una manera mas exacta) a que hora ocurrio el cero energetico
+# se hara una grafica de lineas con otra libreria
+
+# Se importan las funciones necesarias para graficar 
+import plotly.graph_objects as go
+
+# Se establecen las graficas que se pretenten hacer
+fig = go.Figure()
+
+# Se define una lista para cada tecnologia
+tecnologia=["vap","gas","cc","eol","fot","die"]
+
+# Se hace un bucle para hacer todas las tecnologias en una sola grafica
+for i in range(len(tecnologia)):
+    
+    fig.add_trace(go.Scatter(name=f'{tecnologia[i]}',x=gen_por_hora.index, y=gen_por_hora[tecnologia[i]]))
+
+# Se procede a graficar
+fig.update_layout(title = 'Evolución de la generación eléctrica por tecnologia para el dia 29 de septiembre de 2019',
+                  xaxis_title='Hora',yaxis_title='MW')
+fig.show()
+
+
+# Comentario: Con la grafica presentada, se observa con mayor exactitud a que hora fue el cero energetico: a las 14 horas. Justo en ese momento se encendio la turbina de gas (linea roja de la grafica) para dar respuesta rapida a dicho acontecimiento
+
+# A continuación se hara el mismo grafico pero usando seaborn
+
+# In[9]:
+
+
+import seaborn as sns
+sns.set_theme(style="darkgrid")
+
+# El procedimiento es el mismo solo que usando otra libreria
+for i in range(len(tecnologia)):
+    sns.lineplot(x=gen_por_hora.index, y=gen_por_hora[tecnologia[i]],label=tecnologia[i])
+
+
+# 2. Están haciendo un estudio del impacto de las energías renovables en la isla para
+# saber cómo ha evolucionado la apuesta por las mismas.
+
+# ¿Se genera más energía eólica o fotovoltaica actualmente en la isla (últimos
+# 3 años)?
+
+# In[10]:
+
+
+# Agrupo los datos para los ultimos 3 años, tomando en cuenta el año en curso 2020
+datos_ultimos_3_años = datos[(datos.year >= 2017)]
+
+# Calculo el total producido por año para cada tecnologia
+datos_ultimos_3_años_por_año = datos_ultimos_3_años.groupby("year").sum()
+
+# Ahora se hace una grafica para ver la evolucion de los ultimos 3 años
+import numpy as np
+import plotly as plt
+import plotly.graph_objs as go
+from plotly.offline import init_notebook_mode, iplot
+
+año=[2017,2018,2019,2020]
+
+eol_trace=go.Scatter(
+    x=año,
+    y=datos_ultimos_3_años_por_año["eol"],
+    mode="lines",
+    name="eolica"
+)
+fot_trace=go.Scatter(
+    x=año,
+    y=datos_ultimos_3_años_por_año["fot"],
+    mode="lines",
+    name="fotovoltaica"
+)
+
+data=[eol_trace,fot_trace]
+figt=go.Figure(data=data)
+figt.update_layout(title='Total producido de Energias Renovables 2017 al 2020',
+                   xaxis_title='Año',
+                   yaxis_title='W')
+iplot(figt)
+
+
+# Comentario: en el periodo 2017-2018, el total de generacion electrica fue mayor para la tecnologia fotovoltaica, sin embargo, del 2018 en adelante se presento mayor generacion por parte de la generacion eolica
+
+# ¿En qué rango de hora se ha generado durante estos últimos 3 años más
+# energía eólica?
+
+# In[11]:
+
+
+import matplotlib.pyplot as plt
+
+# Agrupo los datos de los datos de los ultimos 3 años por hora
+datos_ultimos_3_años_por_hora = datos_ultimos_3_años.groupby(["hour"]).mean()
+
+y = datos_ultimos_3_años_por_hora["eol"]
+x = datos_ultimos_3_años_por_hora.index
+
+plt.figure(figsize=(20, 5))
+plt.bar(x,y)
+plt.xlabel("Horas")
+plt.ylabel('MW')
+plt.suptitle('Generacion promedio por hora de Energia Eolica para los años 2017-2020')
+plt.show()
+
+print("Desde el año 2017 hasta la actualidad, se produce mayor generación de energía eólica a las",
+      datos_ultimos_3_años_por_hora['eol'].idxmax(),"horas")
+
+print("con un promedio de",datos_ultimos_3_años_por_hora['eol'].max(),"MW")
+
+
+# ¿Cuánto de peso ha tenido en la isla la energía eólica respecto al total de
+# producción (porcentaje) durante los últimos 5 años en la franja de 10 a 20
+# horas? ¿Tiene más peso hace 5 años o ahora?
+
+# In[12]:
+
+
+# Defino una funcion para separar las graficas que sera util mas adelante 
+def separador():
+    print("_____________________________________________________________________________________________________________")
+    print("")
+
+# Creo un pandas vacio
+datos_ultimos_5_años = pd.DataFrame()
+
+# Una lista vacia
+total_eol=[]
+
+# Se evaluan los ultimos 5 años respecto a las horas indicadas
+for i in [2015,2016,2017,2018,2019,2020]:
+    
+    # Primero se filtran los datos por año, y en el rango de hora indicado
+    datos_ultimos_5_años_rango_de_hora = datos[(datos.year == i) & (datos.hour >= 10) & (datos.hour <= 20)]
+    
+    # Se determina la produccion total de energia a traves de energia eolica para el rango obtenido
+    total_eolica_anual = datos_ultimos_5_años_rango_de_hora["eol"].sum()
+    
+    # Se determina la produccion total tomando en cuenta todas las tecnologias para el rango de hora indicado
+    total_total = datos_ultimos_5_años_rango_de_hora["eol"].sum() + datos_ultimos_5_años_rango_de_hora["fot"].sum() + datos_ultimos_5_años_rango_de_hora["cc"].sum()+ datos_ultimos_5_años_rango_de_hora["vap"].sum()+ datos_ultimos_5_años_rango_de_hora["gas"].sum()
+    
+    # Se crea un dataframe con los datos de generacion eolica y total
+    datos_ultimos_5_años = datos_ultimos_5_años.append({'Año': i, 'Generacion Eolica [MW]':total_eolica_anual , "Generacion total [MW]":total_total," % de generacion eolica":(total_eolica_anual*100/total_total)},ignore_index=True)
+    
+    # Se le resta la produccion de energia eolica al total para comparar esta con la produccion total
+    total_total_otras = total_total - total_eolica_anual
+    
+    # Se realizan graficas de queso para comprar los procentajes de produccion total vs energia eolica por año
+    values = [total_eolica_anual, total_total_otras]
+    colors = ["c",'b']
+    explode = [0.1, 0]
+    labels = ['Produccion Eolica Anual', 'Produccion otras tecnologias']
+    plt.pie(values, colors= colors, labels=labels, explode = explode,autopct="%0.1f %%")
+    print("Porcentanje de generacion eolica en funcion de la generacion total por otras tecnologias para el año", i)
+    plt.show()
+    separador()
+
+# En caso de querer observar la comparacion de todos los años en tablas, se imprimen los dataframe creados previamente
+print("Tabla generacion ultimos 5 años")
+datos_ultimos_5_años
+
+
+# Comentario: Es evidente que la energia eolica tiene mas peso actualmente que hace unos años, tal como se ilustra en las graficas y la tabla
+
+# ¿Se ha generado mayor porcentaje de energía eólica durante los últimos diez
+# años en primavera (de 22 marzo a 21 de junio) o en otoño (de 22 de
+# septiembre a 21 de diciembre)?
+
+# In[13]:
+
+
+# Creo pandas vacios
+datos_ultimos_10_años_total_eolica = pd.DataFrame()
+
+# Se evalua la produccion para las fechas y horas indicadas
+for i in range (2012,2021): 
+    # Se hace el procedimiento para el primer periodo descrito
+    datos_ultimos_10_años_1 = datos[(datos.year == i) & (datos.month == 3) & (datos.day >= 22)]
+    datos_ultimos_10_años_2 = datos[(datos.year == i) & (datos.month > 3) & (datos.month < 6)]
+    datos_ultimos_10_años_3 = datos[(datos.year == i) & (datos.month == 6) & (datos.day <= 21)]
+    datos_ultimos_10_años_primavera = pd.concat ([datos_ultimos_10_años_1,datos_ultimos_10_años_2,datos_ultimos_10_años_3])
+
+    # Se hace el procedimiento para el segundo periodo descrito
+    datos_ultimos_10_años_1 = datos[(datos.year == i) & (datos.month == 9) & (datos.day >= 22)]
+    datos_ultimos_10_años_2 = datos[(datos.year == i) & (datos.month > 9) & (datos.month < 12)]
+    datos_ultimos_10_años_3 = datos[(datos.year == i) & (datos.month == 12) & (datos.day <= 21)]
+    datos_ultimos_10_años_otoño = pd.concat ([datos_ultimos_10_años_1,datos_ultimos_10_años_2,datos_ultimos_10_años_3])
+    
+    # Se crea un panda con todos los datos 
+    datos_ultimos_10_años_total_eolica = datos_ultimos_10_años_total_eolica.append({'Año': i,
+                                                                                    'Generacion Eolica Primavera [MW]':datos_ultimos_10_años_primavera["eol"].sum(),
+                                                                                    'Generacion Eolica Otoño [MW]':datos_ultimos_10_años_otoño["eol"].sum()},
+                                                                                   ignore_index=True)
+
+# Se hace una grafica de barras para evaluar la evolucion de la produccion de energia eolica Primavera - Otoño
+import plotly.graph_objects as go
+fig = go.Figure(data=[
+    go.Bar(name='Producción Eólica Primavera', x=datos_ultimos_10_años_total_eolica['Año'], 
+           y=datos_ultimos_10_años_total_eolica['Generacion Eolica Primavera [MW]']),
+    go.Bar(name='Producción Eólica Otoño', x=datos_ultimos_10_años_total_eolica['Año'], 
+           y=datos_ultimos_10_años_total_eolica['Generacion Eolica Otoño [MW]'])])
+
+fig.update_layout(barmode='group', title='Produccion de Eolica periodos de Primavera-Otoño, 2010-2020',
+                   xaxis_title='Year',
+                   yaxis_title='MW')
+fig.show()
+
+# Se hace una grafica de queso con la suma total de los valores obtenidos y asi observar una comparacion mas global
+labels = ['Producción Eólica Primavera','Producción Eólica Otoño']
+fig = go.Figure(data=[go.Pie(labels=labels, 
+                             values=[datos_ultimos_10_años_total_eolica['Generacion Eolica Primavera [MW]'].sum(),
+                                     datos_ultimos_10_años_total_eolica['Generacion Eolica Otoño [MW]'].sum()])])
+
+fig.update_layout(title='Produccion de Eolica TOTAL en MW periodos de Privarea-Otoño, 2010-2020')
+
+fig.show()
+
+
+# Comentario: desde el 2013 hasta el 2016 la produccion de eolica era mayor en primavera que en otoño, en 2017 la produccion en otoño resulto ser mayor, en 2018 la produccion en primavera fue mayor , y desde 2019 hasta la actualidad la produccion ha sido mayor en otoño. De manera que al observar el porcentaje total de la produccion de otoño vs primavera, ha resultado ser mayor la produccion de eolica en otoño
+
+# ¿Cuáles han sido los 5 días de mayor porcentaje de utilización de energías
+# renovables (la combinación de ambas) respecto al total? ¿Y los 5 que
+# menos?
+
+# In[17]:
+
+
+# Se hace un pandas vacio
+prod_renov_por_dia = pd.DataFrame()
+
+# Se hace un ciclo para obtener los valores por dia
+
+# Primero se filtra por año
+for i in range (2012,2021):
+    
+    # Luego se filtra por mes
+    for m in (1,2,3,4,5,6,7,8,9,10,11,12):
+        
+        # Luego se fintra por dia
+        for d in range (1,32):
+            
+            # Se obtiene los datos para cada dia
+            datos_por_dia = datos[(datos.year == i) & (datos.month == m ) & (datos.day == d)]
+            
+            # La produccio de energia a traves de renovables diaria
+            prod_renov = int(datos_por_dia["eol"].sum() + datos_por_dia["fot"].sum())
+            
+            # La produccion total, con renovables, diaria
+            prod_total = prod_renov + int(datos_por_dia["gas"].sum() + datos_por_dia["cc"].sum() + datos_por_dia["vap"].sum() + datos_por_dia["die"].sum())
+            
+            # Si no hay algun error, y la produccion es mayor a cero (que seria lo logico)
+            if prod_total > 0:  
+                prod_renov_porcentaje = prod_renov*100/prod_total
+                # Se obtiene un Dataframe con el porcentaje de produccion a traves de renovables respecto al total
+                prod_renov_por_dia = prod_renov_por_dia.append({'Año': i, 'Month': m, "Day": d,
+                                                                "% de produccion renovable":prod_renov_porcentaje},
+                                                               ignore_index=True)
+
+# Se visualiza el dataframe creado
+prod_renov_por_dia
+
+
+# In[30]:
+
+
+# Se visualizaran los datos con seaborn
+import seaborn as sns
+sns.set_theme(style="whitegrid")
+
+# Se establece la base de datos de la cual se hara la grafica: prod_renov_por_dia
+# Se hara una grafica de puntos para cada mes (y cada año) para evaluar en que hora del dia de cada mes...
+# ...se obtuvieron los mayores valores
+for i in range (1,13):
+    prod_renov_por_dia_mes = prod_renov_por_dia[(prod_renov_por_dia.Mes == i)]
+    cmap = sns.cubehelix_palette(rot=-.2, as_cmap=True)
+    g = sns.relplot(
+        data=prod_renov_por_dia_mes,
+        x="Dia", y="% de produccion renovable",
+        hue="Año", size="Mes",
+        palette=cmap, sizes=(200, 200),
+    )
+    g.ax.xaxis.grid(True, "minor", linewidth=.25)
+    g.ax.yaxis.grid(True, "minor", linewidth=.25)
+    g.despine(left=True, bottom=True)
+
+
+# In[20]:
+
+
+# Sin embargo, la grafica anterior no es la mas comoda para los usuarios, por lo tanto 
+# Otra manera en la que se podria determinar lo pedido es con un mapa de calor 
+
+# La grafica se hara con seaborn
+import seaborn as sns
+
+# Debido a que en 2012 solo hay un dia de estudio (y no es el mayor), se elimina dicho dato para realizar las graficas
+for i in range (2013,2021):
+    prod_renov_por_dia_cat_año = prod_renov_por_dia[(prod_renov_por_dia.Año == i)]
+    
+    # Se organizan los datos para ser representados en mapa de calor con ".pivot"
+    prod_renov_por_dia_calor = prod_renov_por_dia_cat_año.pivot('Month','Day','% de produccion renovable')
+    
+    # Se hace el mapa de calor correspondiente 
+    f, ax = plt.subplots(figsize = (18, 6))
+    plt.title("Percentage of electricity production through renewable sources for the year " + str(i))
+    sns.heatmap(prod_renov_por_dia_calor, annot=True, linewidths=.5, ax=ax, cmap="YlGnBu")
+    plt.show()
+
+
+# De la grafica anterior, se obseva que los mayores % de produccion corresponden a las casillas con colores mas oscuros, y es una manera muy formal de presentar los datos, y se puede identificar facilmente los mayores valores para cada año. Sin embargo, si lo que se busca es responder a la pregunta de ¿Cuáles han sido los 5 días de mayor porcentaje de utilización de energías renovables (la combinación de ambas) respecto al total? ¿Y los 5 que menos? se presenta el siguiente codigo:
+
+# In[21]:
+
+
+# Para determinar con mayor exactitud lo que se pide 
+# Se buscan los 5 dias de mayor y menor porcentaje de produccion a traves de energias renovables
+
+# Se crea un nuevo data frame ya que se le iran borrando datos, se hace esto para no alterar el original
+prod_renov_por_dia1 = prod_renov_por_dia
+x = pd.DataFrame()
+y = pd.DataFrame()
+
+# Se hace una hace una lista de los 5 dias que se genero mas con renovables ...
+# ...(se usara luego para responder las preguntas extra)
+dia_con_mas_renovables = list()
+dias_con_mas_renovables = list()
+
+for i in range(5):
+    dia_con_mas_renovables = list()
+    x = prod_renov_por_dia1.loc[prod_renov_por_dia1['% de produccion renovable'].idxmax()]
+    dia_con_mas_renovables= [x["Dia"],x["Mes"],x["Año"]]
+    dias_con_mas_renovables.append(dia_con_mas_renovables)
+    print("El",i+1,"mayor porcentaje produccion de renovables fue de",
+          x["% de produccion renovable"],"el dia",x["Dia"], "mes",x["Mes"],"del año",x["Año"])
+   
+    # Se elimina el mayor valor del nuevo data frame para buscar el valor que le sigue en la siguiente iteracion del ciclo
+    prod_renov_por_dia1.drop(prod_renov_por_dia1.loc[prod_renov_por_dia1['% de produccion renovable']==x['% de produccion renovable']].index, inplace=True)
+
+    y = prod_renov_por_dia1.loc[prod_renov_por_dia1['% de produccion renovable'].idxmin()]
+    print("El",i+1,"menor porcentaje produccion de renovables fue de",
+          y["% de produccion renovable"],"el dia",y["Dia"], "mes",y["Mes"],"del año",y["Año"])
+    
+    # Se elimina el menor valor del nuevo data frame para buscar el valor que le sigue en la siguiente iteracion del ciclo
+    prod_renov_por_dia1.drop(prod_renov_por_dia1.loc[prod_renov_por_dia1['% de produccion renovable']==y['% de produccion renovable']].index, inplace=True)
+    print("")
+    
+    # El inconveniente de este codigo es que si se ejecuta mas de una vez, los valores seran erroneos,...
+    # ...dado que va eliminando
+    # datos de las listas, por lo que solo debe ejecutarse una vez para responde la pregunta
+
+
+# 2. Quieren saber cuánto se ha acercado la demanda prevista a la demanda real que al
+# final se contabilizó y analizar la efectividad de los algoritmos de predicción. Ver los
+# meses en los que más se ha acertado y en los que menos para analizar si hay un
+# patrón dependiendo de las estaciones o no tiene que ver.
+
+# In[33]:
+
+
+# El procedimiento es parecido al anterior, solo que ahora se hara la discretizacion solo para meses 
+# Se hace un ciclo para obtener los valores por mes
+prod_y_demanda = pd.DataFrame()
+
+# Se filtran los datos por año
+for i in range (2013,2021):
+    
+    # Se filtran los datos por mes
+    for m in (1,2,3,4,5,6,7,8,9,10,11,12):
+        
+        # Se obtienen los datos por mes
+        datos_por_mes = datos[(datos.year == i) & (datos.month == m )]
+        produccion = int(datos_por_mes["eol"].sum() + datos_por_mes["fot"].sum() + datos_por_mes["cc"].sum() + datos_por_mes["vap"].sum() + datos_por_mes["gas"].sum() + datos_por_mes["die"].sum())
+        demanda = int(datos_por_mes["dem"].sum())
+        
+        # Para evaluar las casillas en las que solo hay informacion se hace la siguiente condicion
+        if demanda != 0:
+            # Hay algunos datos erroneos por lo que se hace un promedio para corregirlos
+            if demanda < 0:
+                demanda = demanda_prov
+                produccion = produccion_prov
+                
+            # Se crea un parametro para comparar produccion con la demanda, que sera produccion entre demanda
+            # De manera que si el valor da menor a 1 es porque la demanda fue mayor que la produccion
+            rend = produccion/demanda
+            
+            # Por si encuentra algun valor erroneo
+            demanda_prov = demanda
+            produccion_prov = produccion
+
+            # Creo un pandas produccion y demanda por mes
+            prod_y_demanda = prod_y_demanda.append({'Año': i, 'Mes': m, "Produccion":produccion,
+                                                    "Demanda":demanda,"Rendimiento":rend},ignore_index=True)     
+        
+# Se visuliza el pandas creado
+prod_y_demanda
+
+
+# In[34]:
+
+
+# Se hace una grafica de barras para evaluar la evolucion de la produccion vs demanda para cada año - Otoño
+import plotly.graph_objects as go
+for i in range (2013,2021):
+    datos_por_año = prod_y_demanda[(prod_y_demanda.Año == i)]
+    fig = go.Figure(data=[
+        go.Bar(name='Producción', x=datos_por_año['Mes'], y=datos_por_año['Produccion']),
+        go.Bar(name='Demanda', x=datos_por_año['Mes'], y=datos_por_año['Demanda'])
+    ])
+
+    fig.update_layout(barmode='group', title='Produccion vs Demanda, año ' + str(i),
+                       xaxis_title='Meses',
+                       yaxis_title='MW')
+    fig.show()
+
+    x = datos_por_año.loc[datos_por_año['Rendimiento'].idxmax()]
+    y = datos_por_año.loc[datos_por_año['Rendimiento'].idxmin()]
+    print("Para el año",i,"el algoritmo de prediccion fue mas acertado en el mes",
+          x['Mes'],"con un rendimiento de", x['Rendimiento'])
+    print("Para el año",i,"el algoritmo de prediccion fue menos acertado en el mes",
+          y['Mes'],"con un rendimiento de", y['Rendimiento'])
+    
+
+
+# In[35]:
+
+
+# Como en la grafica de barras no se puede apreciar con exactiud las variaciones del rendimiento...
+# ...se hace una grafica de lineas con el rendimiento
+import plotly.graph_objects as go
+for i in range (2013,2021):
+    datos_por_año = prod_y_demanda[(prod_y_demanda.Año == i)]
+    fig = go.Figure(data=[
+        go.Scatter(name='Rendimiento', x=datos_por_año['Mes'], y=datos_por_año['Rendimiento'])
+    ])
+
+    fig.update_layout(barmode='group', title='Rendimiento:Produccion/Demanda, año ' + str(i),
+                       xaxis_title='Meses',
+                       yaxis_title='Produccion/Demanda')
+    fig.show()
+
+
+# También interesa saber cuáles de las formas de generar es la que más emisiones de
+# co2 produce por producción eléctrica generada. Hacer un análisis de los últimos 5
+# años y definir su tendencia.
+
+# In[36]:
+
+
+# Se crea un dataframe vacio
+emisiones_por_tec = pd.DataFrame()
+
+# Para escoger cual de las tecnologias es la que mas genera emiciones, se hace un estudio por año
+for i in (2015,2016,2017,2018,2019,2020):
+    gen_por_año = datos[(datos.year == i)]
+    em_cc = gen_por_año["em_cc"].sum()
+    em_vap = gen_por_año["em_vap"].sum()
+    em_gas = gen_por_año["em_gas"].sum()
+    em_die = gen_por_año["em_die"].sum()
+    
+    # se llena el dataframe que estaba vacio con los datos obtenidos 
+    emisiones_por_tec = emisiones_por_tec.append({'Año': i, "em_cc":em_cc,"em_vap":em_vap,
+                                                  "em_gas":em_gas,"em_die":em_die},
+                                                 ignore_index=True)         
+
+# Una vez creado el dataframe con las emisiones de cada tecnologia...
+# ...se hace una grafica de lineas con plotly para compararlas
+import numpy as np
+import plotly as plt
+import plotly.graph_objs as go
+from plotly.offline import init_notebook_mode, iplot
+
+cc_trace=go.Scatter(
+    x=emisiones_por_tec["Año"],
+    y=emisiones_por_tec["em_cc"],
+    mode="lines",
+    name="Emiciones CO2 CC"
+)
+vap_trace=go.Scatter(
+    x=emisiones_por_tec["Año"],
+    y=emisiones_por_tec["em_vap"],
+    mode="lines",
+    name="Emiciones CO2 vap"
+)
+gas_trace=go.Scatter(
+    x=emisiones_por_tec["Año"],
+    y=emisiones_por_tec["em_gas"],
+    mode="lines",
+    name="Emiciones CO2 gas"
+)
+die_trace=go.Scatter(
+    x=emisiones_por_tec["Año"],
+    y=emisiones_por_tec["em_die"],
+    mode="lines",
+    name="Emiciones CO2 die"
+)
+
+data=[cc_trace,vap_trace,gas_trace,die_trace]
+figt=go.Figure(data=data)
+figt.update_layout(title='Evolucion del total de emisiones de CO2 producido por tecnologia, 2015-2020',
+                   xaxis_title='Año',
+                   yaxis_title='CO2')
+iplot(figt) 
+
+
+# # Extras:
+
+# 1. Quieren ver un patrón en cuanto a los valores meteorológicos de los 5 días en los que más se generó energía renovable respecto a los propios datos meteorológicos (temperatura media, velocidad de viento media, lluvia). Cogeremos como base la estación del aeropuerto de Tenerife Sur. Luego quieren comparar los datos meteorológicos de esos 5 días (los campos hablados antes) con la media de los últimos 3 años para ver cuánto de excepcionales han sido. ¿Hay algún patrón que se repita esos días?
+
+# In[37]:
+
+
+import requests
+import json
+
+# Se define una funcion para obtener datos de AEMET desde una fecha indicada como entrada
+def obtengo_datos(a1,m1,d1,a2,m2,d2):
+    url = 'https://opendata.aemet.es/opendata/api/valores/climatologicos/diarios/datos/fechaini/{}-{}-{}T00:00:00UTC/fechafin/{}-{}-{}T23:59:59UTC/estacion/C429I'.format(a1,m1,d1,a2,m2,d2)
+
+    # Esta es personal a cada uno
+    api_key = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbHUwMTAxNDQ3MDU2QHVsbC5lZHUuZXMiLCJqdGkiOiIyMGNmNGJlMy02NDBhLTRlZTItYWU2ZS0yYjkzMDc0MTU0ZmUiLCJpc3MiOiJBRU1FVCIsImlhdCI6MTYxNzEyMzg0MSwidXNlcklkIjoiMjBjZjRiZTMtNjQwYS00ZWUyLWFlNmUtMmI5MzA3NDE1NGZlIiwicm9sZSI6IiJ9.drkbNcv_jR5VFpS2yI5BVsjBbhLDPDMfZvhzdcR3F6g"
+    querystring = {"api_key":api_key}
+
+    headers = {
+        'cache-control': "no-cache"
+        }
+
+    # Obtener código datos
+    response = requests.request("GET", url, params=querystring)
+    data = response.json()
+
+    codigo = data['datos']
+
+    response = requests.request("GET", codigo, params=querystring)
+    data = response.json()
+    
+    dates = pd.DataFrame(data)
+    return (dates)
+
+
+# In[38]:
+
+
+# Creo un df vacio 
+mas_renovables = pd.DataFrame()
+
+# De un apartado anterior se tiene una tupla con los 5 dias con mas produccion de renovables, se le cambia el nombre para trabajar mas facil 
+x=dias_con_mas_renovables
+
+# Se hace un ciclo para obtener los datos de los 5 dias
+for i in range(len(x)):
+    
+    # La funcion de obtengo datos tiene como parametros de entrada la fecha de inicio y de fin 
+    # Como solo se evalua un dia, solo se evalua la fecha del dia correspondiente al df de x
+    dates=obtengo_datos(str(int(x[i][2])),str(int(x[i][1])),str(int(x[i][0])),str(int(x[i][2])),str(int(x[i][1])),str(int(x[i][0])))
+    
+    # Se unen los datos obtenidos a los que se tenian anteriormente
+    mas_renovables = pd.concat([mas_renovables, dates],ignore_index=True)
+
+# Se visualizan los datos correspondientes a los dias con mas renovables, con la informacion obtenida en AEMET
+mas_renovables
+
+
+# In[39]:
+
+
+# Es necesario tener los valores e tmed y velmedia y remplazar las comas por puntos para poder trabajarlos
+# Se transformaran los valores de Dataframe a Listas
+lista_tmed=[]
+lista_velmedia=[]
+for i in range (len(mas_renovables)): 
+        # Se cambian las comas por puntos 
+        tmed = (str(mas_renovables["tmed"][i])).replace(",",".")
+        velmedia = (str(mas_renovables["velmedia"][i])).replace(",",".")
+        # Se añaden los valores a lista creadas
+        lista_tmed.append(float(tmed))
+        lista_velmedia.append(float(velmedia))
+
+
+# In[40]:
+
+
+# Se obtienen los datos de AEMET para los ultimos tres años ahora
+ultimos_tres = obtengo_datos("2017","01","1","2020","01","1")
+ultimos_tres
+
+
+# In[41]:
+
+
+# Se utiliza la libreria statistics para hacer el promedio de los valores
+import statistics
+
+# Se define una funcion para obtener el promedio y que se eliminen los errores a la vez
+def promedios(ultimos_tres,x):
+
+    # Se hace una lista vacia
+    tmed_ultimos_3 = []
+
+    # Se recorren todos los valores correspondientes a los ultimos 3 años
+    for i in range (len(ultimos_tres)): 
+
+        # Se evalua la la temperatura (o velocidad del viento) para cada dia durante los 3 años
+        # Se cambian las comas por puntos para luego poder calcular el promedio con la funcion mean
+        tmed = (str(ultimos_tres[x][i])).replace(",",".")
+
+        # Se eliminan los errores (Valores NaN)
+        if tmed != "nan":
+            tmed_ultimos_3.append(float(tmed))
+
+    prom_tmed_ultimos_3 = statistics.mean(tmed_ultimos_3)
+    
+    return (prom_tmed_ultimos_3)
+
+
+# In[42]:
+
+
+# Se calcula el promedio de la temperatura y velocidad media del viento para los ultimos 3 años
+tmed_3años = promedios(ultimos_tres,"tmed")
+velmedia_3años = promedios(ultimos_tres,"velmedia")
+
+
+# In[43]:
+
+
+# Se hace una lista con la posicion de los dias con mayor produccion de energias renovables
+dias_con_mas_renovable = ["1er","2do","3ro","4to","5to"]
+
+# Se utilizara la siguiente libreria
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+
+# Se haran dos graficos, uno para temperaturas y otro para velocidades del viento
+fig = make_subplots(rows=1, cols=2,
+                   subplot_titles=("Temperaturas","Velocidad del viento"))
+
+fig.add_trace(
+    go.Scatter(
+        x=dias_con_mas_renovable,
+        y=lista_tmed,
+        mode="markers+text",
+        text=dias_con_mas_renovable,
+        textposition="bottom center",
+        name="Temperatura (ºC)"
+    ),
+    row=1, col=1
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=dias_con_mas_renovable,
+        y=[tmed_3años,tmed_3años,tmed_3años,tmed_3años,tmed_3años],
+        name= "Temperatura promedio ultimos 3 años"
+    ),
+    row=1, col=1
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=dias_con_mas_renovable,
+        y=lista_velmedia,
+        mode="markers+text",
+        text=dias_con_mas_renovable,
+        textposition="bottom center",
+        name="Velocidad media del viento (m/s)"
+    ),
+    row=1, col=2
+)
+
+fig.add_trace(
+    go.Scatter(
+        x=dias_con_mas_renovable,
+        y=[velmedia_3años,velmedia_3años,velmedia_3años,velmedia_3años,velmedia_3años],
+        name= "Velocidad media promedio ultimos 3 años"
+    ),
+    row=1, col=2
+)
+
+
+fig.update_layout(title='Temperatura y velocidad del viento de los dias con mas renovables vs promedio ultimos 3 años')
+
+fig.show()
+
+# Se pretende ademas observar la diferencia entre los valores de cada dia y el promedio
+for i in range (len(lista_tmed)):
+    print("El dia",i+1,"con mas renovables presento una diferencia de temperatura y velocidad del viento de",
+          (-tmed_3años)+(lista_tmed[i]),"ºC y",(-velmedia_3años)+(lista_tmed[i]),
+          "m/s, respectivamente, respecto al promedio de los ultimos 3 años")
+    print()
+
+
+# Se observa que los dias que presentaron mas generacion de energia a traves de energia renovables se caracterizan por presentar una velocidad del viento considerablemente mayor que el promedio anual. Respecto a la temperatura, se observa que existe un aumento en los dias donde hay mas generacion de energia a traves de energias renovables
+
+# Se observa una clara diferencia en los valores de velocidad del viento, mucho mayor al promedio, a lo cual prodia atribuirse la generacion de energia a traves de energia eolica
+
+# 2. Quieren saber si los meses de verano más calurosos desde cuando tenemos datos (los junio, julio, agosto y septiembre por separado desde el inicio de los datos) han coincidido con mayor demanda energética respecto a la media.
+
+# In[44]:
+
+
+# Se utiliza los dataframe creados en ejercicios anteriores 
+prod_y_demanda
+
+
+# In[45]:
+
+
+import matplotlib.pyplot as plt
+
+# Se evalua la demanda de energia por mes para cada año
+for i in range (2013,2020):
+    prod_y_demanda_año = prod_y_demanda[(prod_y_demanda["Año"] == i)]
+    y = prod_y_demanda_año["Demanda"]
+    x = prod_y_demanda_año["Mes"]
+
+    plt.figure(figsize=(20, 5))
+    plt.bar(x,y)
+    
+    plt.xlabel("Mes")
+    plt.ylabel('Demanda MW')
+    plt.suptitle('Demanda por mes para el año ' + str(i))
+    plt.show()
+
+
+# In[46]:
+
+
+# Sin embargo, de esta manera es muy dificil saber si la demanda para los meses indicados es mayor
+# Se usara las tablas que proporciona matplotlib
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Se crea un dataframe vacio
+prod_y_demanda_año_mes = pd.DataFrame()
+
+# Se evalua por año
+for i in range (2013,2021):
+    prod_y_demanda_año_mes = pd.DataFrame()
+    
+    # Se evalua por mes
+    for j in range(1,13):
+        prod_y_demanda_año = prod_y_demanda[(prod_y_demanda["Año"] == i) & (prod_y_demanda["Mes"] == j)]
+        prod_y_demanda_año_mes = prod_y_demanda_año_mes.append({'Mes': j, 'Demanda': prod_y_demanda_año["Demanda"].sum()},
+                                                               ignore_index=True)
+
+    # SE ordena lo obenido de mayor a menor
+    datos_ordenados = prod_y_demanda_año_mes.sort_values('Demanda',ascending=False)
+
+    # Se visualizan las tablas para cada año, con la demanda ordenada por mes (y ordenada de mayor a menor)
+    fig, ax = plt.subplots()
+    # hide axes
+    fig.patch.set_visible(False)
+    ax.axis('off')
+    ax.axis('tight')
+    df = datos_ordenados
+    ax.table(cellText=df.values, colLabels=df.columns, loc='center')
+    ax.set_title("Demanda total por mes (MW) del año " + str(i) + " ordenada por meses de mayor a menor")
+    fig.tight_layout()
+    plt.show() 
+
+
+# Se observa de las tablas planteadas anteriormente, que los meses donde suele haber mayor consumo son julio, agosto y septiembre, lo cual podria decirse que coincide con ls meses mas calurosos. 
+# Sin embargo, se observa tambien un importante consumo para los meses de octubre y diciembre 
